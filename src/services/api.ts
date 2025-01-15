@@ -10,7 +10,7 @@ import type { Message } from '../types';
 const isProduction = import.meta.env.PROD;
 
 const API_BASE_URL = isProduction
-  ? 'https://mental-healthsupportchatbot-bnbo.onrender.com/'
+  ? 'https://mental-healthsupportchatbot-bnbo.onrender.com'
   : 'http://localhost:3000';
 
 export const chatService = {
