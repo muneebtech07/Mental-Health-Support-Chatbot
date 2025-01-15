@@ -19,13 +19,13 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'https://mental-health-supportchatbot.onrender.com',
-  'https://mental-healthsupportchatbot.onrender.com/'
+  'https://mental-healthsupportchatbot-bnbo.onrender.com/'
 ];
 
 // Middleware
 app.use(express.json());
 app.use(cors({
-  origin: function(origin, callback) {
+  origin: function (origin, callback) {
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
@@ -69,10 +69,10 @@ app.post('/chat', validateChatInput, async (req, res) => {
     }
 
     const { message, context = [] } = req.body;
-    
+
     const anonymizedMessage = message.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[EMAIL]')
-                                   .replace(/\b\d{10}\b/g, '[PHONE]')
-                                   .replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, '[PHONE]');
+      .replace(/\b\d{10}\b/g, '[PHONE]')
+      .replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, '[PHONE]');
 
     // Convert context messages to chat history format
     const chatHistory = context.map(msg => ({
@@ -98,13 +98,13 @@ app.post('/chat', validateChatInput, async (req, res) => {
     const result = await chat.sendMessage(anonymizedMessage);
     const response = await result.response;
 
-    res.json({ 
+    res.json({
       message: response.text(),
       timestamp: new Date().toISOString()
     });
   } catch (error) {
     console.error('Chat error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to process your message',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -150,7 +150,7 @@ app.get('/resources', (req, res) => {
       }
     ]
   };
-  
+
   res.json(resources);
 });
 
