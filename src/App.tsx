@@ -1,8 +1,3 @@
-/**
- * Main App component
- * @author MuNeeB Tech
- */
-
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, Plus, Edit2, Trash2, SmilePlus } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
@@ -126,7 +121,16 @@ function App() {
   const [showMoodTracker, setShowMoodTracker] = useState(false);
   const [showChatHistory, setShowChatHistory] = useState(false);
   
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const savedMessages = localStorage.getItem('currentChatMessages');
+    return savedMessages ? JSON.parse(savedMessages, (key, value) => {
+      if (key === 'timestamp') {
+        return new Date(value);
+      }
+      return value;
+    }) : [];
+  });
+
   const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => {
     const saved = localStorage.getItem('chatSessions');
     return saved ? JSON.parse(saved, (key, value) => {
@@ -137,7 +141,9 @@ function App() {
     }) : [];
   });
 
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(() => {
+    return localStorage.getItem('currentSessionId');
+  });
 
   const [moodEntries, setMoodEntries] = useState<MoodEntry[]>(() => {
     const saved = localStorage.getItem('moodEntries');
@@ -169,6 +175,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+    localStorage.setItem('currentChatMessages', JSON.stringify(messages));
+  }, [messages]);
 
   useEffect(() => {
     if (currentSessionId) {
@@ -204,6 +214,8 @@ function App() {
     }
     setMessages([]);
     setCurrentSessionId(null);
+    localStorage.removeItem('currentChatMessages');
+    localStorage.removeItem('currentSessionId');
   };
 
   const saveCurrentChat = () => {
@@ -219,10 +231,8 @@ function App() {
     };
 
     setChatSessions(prev => {
-      // Only update if the session has changed
       const existingSessionIndex = prev.findIndex(session => session.id === newSession.id);
       if (existingSessionIndex !== -1) {
-        // Update existing session only if messages have changed
         const existingSession = prev[existingSessionIndex];
         if (JSON.stringify(existingSession.messages) === JSON.stringify(newSession.messages)) {
           return prev;
@@ -277,7 +287,6 @@ function App() {
       };
       setMessages(prevMessages => [...prevMessages, botMessage]);
 
-      // Only save after both messages are added
       if (!currentSessionId) {
         const sessionId = Date.now().toString();
         setCurrentSessionId(sessionId);
@@ -289,15 +298,13 @@ function App() {
   };
 
   const handleSelectSession = (session: ChatSession) => {
-   // if (currentSessionId !== session.id) {
-      if (messages.length > 0) {
-        saveCurrentChat();
-      }
-      setMessages(session.messages);
-      setCurrentSessionId(session.id);
-      setShowChatHistory(false);
-      setActiveTab('chat');
- //   }
+    if (messages.length > 0) {
+      saveCurrentChat();
+    }
+    setMessages(session.messages);
+    setCurrentSessionId(session.id);
+    setShowChatHistory(false);
+    setActiveTab('chat');
   };
 
   const handleDeleteSession = (sessionId: string) => {
@@ -305,6 +312,8 @@ function App() {
     if (currentSessionId === sessionId) {
       setMessages([]);
       setCurrentSessionId(null);
+      localStorage.removeItem('currentChatMessages');
+      localStorage.removeItem('currentSessionId');
     }
   };
 
