@@ -1,3 +1,7 @@
+/**
+ * Main App component
+ * @author MuNeeB Tech
+ */
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, Plus, Edit2, Trash2, SmilePlus } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
@@ -113,36 +117,55 @@ function App() {
     const savedUser = localStorage.getItem('user');
     return savedUser ? JSON.parse(savedUser) : null;
   });
-  
+
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('activeTab') || 'chat';
   });
-  
+
   const [showMoodTracker, setShowMoodTracker] = useState(false);
   const [showChatHistory, setShowChatHistory] = useState(false);
-  
+
   const [messages, setMessages] = useState<Message[]>(() => {
-    const savedMessages = localStorage.getItem('currentChatMessages');
-    return savedMessages ? JSON.parse(savedMessages, (key, value) => {
-      if (key === 'timestamp') {
-        return new Date(value);
+    try {
+      const savedMessages = localStorage.getItem('currentChatMessages');
+      if (savedMessages) {
+        return JSON.parse(savedMessages, (key, value) => {
+          if (key === 'timestamp') {
+            return new Date(value);
+          }
+          return value;
+        });
       }
-      return value;
-    }) : [];
+    } catch (error) {
+      console.error('Error loading messages from localStorage:', error);
+    }
+    return [];
   });
 
   const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => {
-    const saved = localStorage.getItem('chatSessions');
-    return saved ? JSON.parse(saved, (key, value) => {
-      if (key === 'timestamp' || key === 'createdAt' || key === 'lastMessageAt') {
-        return new Date(value);
+    try {
+      const saved = localStorage.getItem('chatSessions');
+      if (saved) {
+        return JSON.parse(saved, (key, value) => {
+          if (key === 'timestamp' || key === 'createdAt' || key === 'lastMessageAt') {
+            return new Date(value);
+          }
+          return value;
+        });
       }
-      return value;
-    }) : [];
+    } catch (error) {
+      console.error('Error loading chat sessions from localStorage:', error);
+    }
+    return [];
   });
 
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(() => {
-    return localStorage.getItem('currentSessionId');
+    try {
+      return localStorage.getItem('currentSessionId') || null;
+    } catch (error) {
+      console.error('Error loading currentSessionId from localStorage:', error);
+      return null;
+    }
   });
 
   const [moodEntries, setMoodEntries] = useState<MoodEntry[]>(() => {
@@ -167,26 +190,41 @@ function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Persistence effects
   useEffect(() => {
-    localStorage.setItem('chatSessions', JSON.stringify(chatSessions));
+    try {
+      if (messages.length > 0) {
+        localStorage.setItem('currentChatMessages', JSON.stringify(messages));
+      } else {
+        localStorage.removeItem('currentChatMessages');
+      }
+    } catch (error) {
+      console.error('Error saving messages to localStorage:', error);
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    try {
+      if (currentSessionId) {
+        localStorage.setItem('currentSessionId', currentSessionId);
+      } else {
+        localStorage.removeItem('currentSessionId');
+      }
+    } catch (error) {
+      console.error('Error saving currentSessionId to localStorage:', error);
+    }
+  }, [currentSessionId]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('chatSessions', JSON.stringify(chatSessions));
+    } catch (error) {
+      console.error('Error saving chatSessions to localStorage:', error);
+    }
   }, [chatSessions]);
 
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
   }, [activeTab]);
-
-  useEffect(() => {
-    localStorage.setItem('currentChatMessages', JSON.stringify(messages));
-  }, [messages]);
-
-  useEffect(() => {
-    if (currentSessionId) {
-      localStorage.setItem('currentSessionId', currentSessionId);
-    } else {
-      localStorage.removeItem('currentSessionId');
-    }
-  }, [currentSessionId]);
 
   useEffect(() => {
     localStorage.setItem('moodEntries', JSON.stringify(moodEntries));
@@ -196,7 +234,6 @@ function App() {
     localStorage.setItem('goals', JSON.stringify(goals));
   }, [goals]);
 
-  // Handle beforeunload
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (messages.length > 0) {
@@ -214,16 +251,22 @@ function App() {
     }
     setMessages([]);
     setCurrentSessionId(null);
-    localStorage.removeItem('currentChatMessages');
-    localStorage.removeItem('currentSessionId');
+    try {
+      localStorage.removeItem('currentChatMessages');
+      localStorage.removeItem('currentSessionId');
+    } catch (error) {
+      console.error('Error clearing localStorage:', error);
+    }
   };
 
   const saveCurrentChat = () => {
     if (messages.length === 0) return;
 
     const firstUserMessage = messages.find(m => m.sender === 'user')?.content || 'New Chat';
+    const sessionId = currentSessionId || Date.now().toString();
+
     const newSession: ChatSession = {
-      id: currentSessionId || Date.now().toString(),
+      id: sessionId,
       title: firstUserMessage.slice(0, 50) + (firstUserMessage.length > 50 ? '...' : ''),
       messages: messages,
       createdAt: new Date(),
@@ -231,10 +274,10 @@ function App() {
     };
 
     setChatSessions(prev => {
-      const existingSessionIndex = prev.findIndex(session => session.id === newSession.id);
+      const existingSessionIndex = prev.findIndex(session => session.id === sessionId);
       if (existingSessionIndex !== -1) {
         const existingSession = prev[existingSessionIndex];
-        if (JSON.stringify(existingSession.messages) === JSON.stringify(newSession.messages)) {
+        if (JSON.stringify(existingSession.messages) === JSON.stringify(messages)) {
           return prev;
         }
         const updatedSessions = [...prev];
@@ -275,7 +318,16 @@ function App() {
         timestamp: new Date(),
         username: user?.username
       };
-      setMessages(prevMessages => [...prevMessages, userMessage]);
+
+      setMessages(prevMessages => {
+        const newMessages = [...prevMessages, userMessage];
+        try {
+          localStorage.setItem('currentChatMessages', JSON.stringify(newMessages));
+        } catch (error) {
+          console.error('Error saving messages to localStorage:', error);
+        }
+        return newMessages;
+      });
 
       const response = await chatService.sendMessage(content, context);
 
@@ -285,11 +337,25 @@ function App() {
         sender: 'bot',
         timestamp: new Date()
       };
-      setMessages(prevMessages => [...prevMessages, botMessage]);
+
+      setMessages(prevMessages => {
+        const newMessages = [...prevMessages, botMessage];
+        try {
+          localStorage.setItem('currentChatMessages', JSON.stringify(newMessages));
+        } catch (error) {
+          console.error('Error saving messages to localStorage:', error);
+        }
+        return newMessages;
+      });
 
       if (!currentSessionId) {
         const sessionId = Date.now().toString();
         setCurrentSessionId(sessionId);
+        try {
+          localStorage.setItem('currentSessionId', sessionId);
+        } catch (error) {
+          console.error('Error saving currentSessionId to localStorage:', error);
+        }
       }
     } catch (error) {
       console.error('Error getting bot response:', error);
@@ -303,6 +369,12 @@ function App() {
     }
     setMessages(session.messages);
     setCurrentSessionId(session.id);
+    try {
+      localStorage.setItem('currentChatMessages', JSON.stringify(session.messages));
+      localStorage.setItem('currentSessionId', session.id);
+    } catch (error) {
+      console.error('Error saving session data to localStorage:', error);
+    }
     setShowChatHistory(false);
     setActiveTab('chat');
   };
@@ -312,8 +384,12 @@ function App() {
     if (currentSessionId === sessionId) {
       setMessages([]);
       setCurrentSessionId(null);
-      localStorage.removeItem('currentChatMessages');
-      localStorage.removeItem('currentSessionId');
+      try {
+        localStorage.removeItem('currentChatMessages');
+        localStorage.removeItem('currentSessionId');
+      } catch (error) {
+        console.error('Error clearing localStorage:', error);
+      }
     }
   };
 
