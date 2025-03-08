@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
 // CORS configuration
 const allowedOrigins = [
@@ -48,12 +48,60 @@ app.use('/chat', limiter);
 app.use('/resources', limiter);
 
 const MENTAL_HEALTH_CONTEXT = `You are a supportive mental health chatbot. Your responses should be:
+- Always formatted with bullet points
+- Include relevant emojis to make the message more engaging and supportive
+- Start with a supportive emoji that matches the user's emotional state
 - Empathetic and understanding
 - Focused on mental health support and well-being
 - Non-judgmental and encouraging
 - Clear about not being a replacement for professional help
 - Careful to avoid medical advice or diagnosis
-Always recommend professional help for serious concerns.`;
+Always recommend professional help for serious concerns.
+
+Format your responses like this example:
+🤗 I understand how you're feeling. Let me help:
+
+• 💭 Your feelings are valid and it's okay to feel this way
+• 🌱 Here are some things that might help:
+  • Take deep breaths
+  • Go for a walk
+• 💪 Remember that you're stronger than you think
+• 🤝 Consider talking to someone you trust about this
+
+Always use bullet points and relevant emojis to make the response more engaging and supportive.`;
+
+// Non-mental health related keywords and patterns
+const NON_MENTAL_HEALTH_PATTERNS = [
+  /\d[\s+\-*/%=]\d/,  // Mathematical operations
+  /write.*code/i,     // Code requests
+  /create.*program/i, // Programming requests
+  /what is.*\d+.*\+.*\d+/i, // Math questions
+  /how to code/i,     // Coding questions
+  /programming/i,     // Programming related
+  /development/i,     // Development related
+  /algorithm/i,       // Technical terms
+  /database/i,        // Technical terms
+  /script/i,          // Technical terms
+];
+
+// Check if message is about the chatbot's creator
+const isCreatorQuery = (message) => {
+  const creatorPatterns = [
+    /who.*made.*you/i,
+    /who.*created.*you/i,
+    /who.*developed.*you/i,
+    /who.*your.*creator/i,
+    /who.*your.*developer/i,
+    /who.*your.*owner/i,
+    /who.*designed.*you/i,
+  ];
+  return creatorPatterns.some(pattern => pattern.test(message));
+};
+
+// Check if message is non-mental health related
+const isNonMentalHealthQuery = (message) => {
+  return NON_MENTAL_HEALTH_PATTERNS.some(pattern => pattern.test(message));
+};
 
 const validateChatInput = [
   body('message').trim().notEmpty().withMessage('Message cannot be empty')
@@ -69,6 +117,22 @@ app.post('/chat', validateChatInput, async (req, res) => {
     }
 
     const { message, context = [] } = req.body;
+
+    // Check for creator/developer queries
+    if (isCreatorQuery(message)) {
+      return res.json({
+        message: "I was created at MuNeeB Tech, a skilled developer focused on building supportive mental health solutions.",
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Check for non-mental health queries
+    if (isNonMentalHealthQuery(message)) {
+      return res.json({
+        message: "I apologize, but I'm specifically designed to provide mental health support and cannot assist with other topics like coding, mathematics, or technical questions. Please feel free to ask me about your feelings, emotions, or mental well-being.",
+        timestamp: new Date().toISOString()
+      });
+    }
 
     const anonymizedMessage = message.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[EMAIL]')
       .replace(/\b\d{10}\b/g, '[PHONE]')
